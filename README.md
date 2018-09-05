@@ -1,2 +1,1 @@
-# VoiceChange
-VoiceChange with DiscoGAN
+# VoiceConverter with CycelGAN
