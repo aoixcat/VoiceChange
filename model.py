@@ -1,18 +1,21 @@
 import os
 import tensorflow as tf
-from module import discriminator, generator_gatedcnn
+from module import discriminator, generator_gatedcnn, generator_new
 from utils import l1_loss, l2_loss, cross_entropy_loss
 from datetime import datetime
 
 class CycleGAN(object):
 
-    def __init__(self, num_features, discriminator = discriminator, generator = generator_gatedcnn, mode = 'train', log_dir = './log'):
+    def __init__(self, num_features, discriminator = discriminator, generator = generator_new, mode = 'train', log_dir = './log', useNewModel = True):
 
         self.num_features = num_features
         self.input_shape = [None, num_features, None] # [batch_size, num_features, num_frames]
 
         self.discriminator = discriminator
-        self.generator = generator
+        if (useNewModel):
+            self.generator = generator_new
+        else:
+            self.generator = generator_gatedcnn
         self.mode = mode
 
         self.build_model()

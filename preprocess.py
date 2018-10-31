@@ -10,9 +10,11 @@ def load_wavs(wav_dir, sr):
     for file in os.listdir(wav_dir):
         if(file.count("wav") == 0):
             continue        
+        """
         debug_num += 1
         if (debug_num > 100):
             break
+        """
         file_path = os.path.join(wav_dir, file)
         wav, _ = librosa.load(file_path, sr = sr, mono = True)
         #wav = wav.astype(np.float64)
