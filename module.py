@@ -164,31 +164,29 @@ def generator_new(inputs, reuse = False, scope_name = 'generator_gatedcnn', num_
 
         # Downsample
         d1 = downsample1d_block(inputs = h1_glu, filters = 256, kernel_size = 5, strides = 2, name_prefix = 'downsample1d_block1_')
-        d2 = conv1d_layer(inputs = d1, filters = 256, kernel_size = 5, strides = 2, activation = None, name = 'd2_conv')
-        d3 = downsample1d_block(inputs = d2, filters = 512, kernel_size = 5, strides = 2, name_prefix = 'downsample1d_block2_')
-        d4 = conv1d_layer(inputs = d3, filters = 512, kernel_size = 5, strides = 2, activation = None, name = 'd4_conv')
+        d2 = downsample1d_block(inputs = d1, filters = 512, kernel_size = 5, strides = 2, name_prefix = 'downsample1d_block2_')
 
         # Residual blocks
-        r1 = residual1d_block(inputs = d4, filters = 1024, kernel_size = 4, strides = 1, name_prefix = 'residual1d_block1_')
+        r1 = residual1d_block(inputs = d2, filters = 1024, kernel_size = 4, strides = 1, name_prefix = 'residual1d_block1_')
         r2 = residual1d_block(inputs = r1, filters = 1024, kernel_size = 4, strides = 1, name_prefix = 'residual1d_block2_')
-        r3 = residual1d_block(inputs = r2, filters = 1024, kernel_size = 2, strides = 1, name_prefix = 'residual1d_block3_')
-        r4 = residual1d_block(inputs = r3, filters = 1024, kernel_size = 2, strides = 1, name_prefix = 'residual1d_block4_')
-        r5 = residual1d_block(inputs = r4, filters = 1024, kernel_size = 4, strides = 1, name_prefix = 'residual1d_block5_')
-        r6 = residual1d_block(inputs = r5, filters = 1024, kernel_size = 4, strides = 1, name_prefix = 'residual1d_block6_')
+        rd1 = downsample1d_block(inputs = r2, filters = 1024, kernel_size = 4, strides = 2, name_prefix = 'downsample1d_block_r1')
+        r30 = residual1d_block(inputs = rd1, filters = 2048, kernel_size = 3, strides = 1, name_prefix = 'residual1d_block30_')
+        r31 = residual1d_block(inputs = r30, filters = 2048, kernel_size = 2, strides = 1, name_prefix = 'residual1d_block31_')
+        r32 = residual1d_block(inputs = r31, filters = 2048, kernel_size = 2, strides = 1, name_prefix = 'residual1d_block32_')
+        r33 = residual1d_block(inputs = r32, filters = 2048, kernel_size = 3, strides = 1, name_prefix = 'residual1d_block33_')
+        ru1 = upsample1d_block(inputs = r33, filters = 1024, kernel_size = 4, strides = 1, shuffle_size = 2, name_prefix = 'upsample1d_block_r1')
+        r4 = residual1d_block(inputs = ru1, filters = 1024, kernel_size = 4, strides = 1, name_prefix = 'residual1d_block5_')
+        r5 = residual1d_block(inputs = r4, filters = 1024, kernel_size = 4, strides = 1, name_prefix = 'residual1d_block6_')
 
         # Upsample
-        u1 = upsample1d_block(inputs = r6, filters = 1024, kernel_size = 5, strides = 1, shuffle_size = 2, name_prefix = 'upsample1d_block1_')
-        u2 = conv1d_layer(inputs = u2, filters = 1024, kernel_size = 5, strides = 2, activation = None, name = 'u2_conv')
-        u3 = upsample1d_block(inputs = u3, filters = 512, kernel_size = 5, strides = 1, shuffle_size = 2, name_prefix = 'upsample1d_block2_')
-        u4 = conv1d_layer(inputs = u4, filters = 256, kernel_size = 5, strides = 2, activation = None, name = 'u4_conv')
-        u5 = conv1d_layer(inputs = u5, filters = 128, kernel_size = 15, strides = 1, activation = None, name = 'u4_conv')
-        
+        u1 = upsample1d_block(inputs = r5, filters = 1024, kernel_size = 5, strides = 1, shuffle_size = 2, name_prefix = 'upsample1d_block1_')
+        u2 = upsample1d_block(inputs = u1, filters = 512, kernel_size = 5, strides = 1, shuffle_size = 2, name_prefix = 'upsample1d_block2_')
 
         # Output
-        o1 = conv1d_layer(inputs = u5, filters = num_features, kernel_size = 15, strides = 1, activation = None, name = 'o1_conv')
-        outputs = tf.transpose(o1, perm = [0, 2, 1], name = 'outputs_transpose')
+        o1 = conv1d_layer(inputs = u2, filters = num_features, kernel_size = 15, strides = 1, activation = None, name = 'o1_conv')
+        o2 = tf.transpose(o1, perm = [0, 2, 1], name = 'output_transpose')
 
-    return outputs
+    return o2
 
 def generator_gatedcnn(inputs, reuse = False, scope_name = 'generator_gatedcnn', num_features = 24):
 
