@@ -99,8 +99,8 @@ class CycleGAN(object):
         #for var in t_vars: print(var.name)
 
         # Reserved for test
-        self.generation_B_test = self.generator(inputs = self.input_A_test, reuse = True, scope_name = 'generator_A2B', num_features = self.num_features)
-        self.generation_A_test = self.generator(inputs = self.input_B_test, reuse = True, scope_name = 'generator_B2A', num_features = self.num_features)
+        self.generation_B_test = self.generator(inputs = self.input_A_test, reuse = True, scope_name = 'generator_A2B', num_features = self.num_features, training = False)
+        self.generation_A_test = self.generator(inputs = self.input_B_test, reuse = True, scope_name = 'generator_B2A', num_features = self.num_features, training = False)
 
 
     def optimizer_initializer(self):

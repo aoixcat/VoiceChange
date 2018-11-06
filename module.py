@@ -145,7 +145,66 @@ def pixel_shuffler(inputs, shuffle_size = 2, name = None):
 
     return outputs
 
-def generator_new(inputs, reuse = False, scope_name = 'generator_gatedcnn', num_features = 24):
+class UNet():
+    
+    # Convolution layer
+    @staticmethod
+    def conv(inputs, filters, kernel_size=3, activation=tf.nn.relu, l2_reg_scale=None, batchnorm_istraining=None,name = None):
+        if l2_reg_scale is None:
+            regularizer = None
+        else:
+            regularizer = tf.contrib.layers.l2_regularizer(scale=l2_reg_scale)
+        conved = tf.layers.conv1d(
+            inputs=inputs,
+            filters=filters,
+            kernel_size=kernel_size,
+            padding="same",
+            activation=activation,
+            name = name
+        )
+        if batchnorm_istraining is not None:
+            conved = UNet.bn(conved, batchnorm_istraining)
+
+        return conved
+    # Batch normalization
+    @staticmethod
+    def bn(inputs, is_training):
+        normalized = tf.layers.batch_normalization(
+            inputs=inputs,
+            axis=-1,
+            momentum=0.9,
+            epsilon=0.001,
+            center=True,
+            scale=True,
+            training=is_training,
+        )
+        return normalized
+
+    # Pooling layer
+    @staticmethod
+    def pool(inputs):
+        pooled = tf.layers.max_pooling1d(inputs=inputs, pool_size=2, strides=2)
+        return pooled
+
+    # Transpose convolution layer (Deconvolution)
+    @staticmethod
+    def conv_transpose(inputs, filters, l2_reg_scale=None, name = None):
+        if l2_reg_scale is None:
+            regularizer = None
+        else:
+            regularizer = tf.contrib.layers.l2_regularizer(scale=l2_reg_scale)
+        conved = tf.layers.conv1d_transpose(
+            inputs=inputs,
+            filters=filters,
+            strides=2,
+            kernel_size=2,
+            padding='same',
+            activation=tf.nn.relu,
+            kernel_regularizer=regularizer
+        )
+        return conved
+
+def generator_new(inputs, reuse = False, scope_name = 'generator_gatedcnn', num_features = 24, training = True):
 
     # inputs has shape [batch_size, num_features, time]
     # we need to convert it to [batch_size, time, num_features] for 1D convolution
@@ -157,38 +216,63 @@ def generator_new(inputs, reuse = False, scope_name = 'generator_gatedcnn', num_
             scope.reuse_variables()
         else:
             assert scope.reuse is False
+            
+        is_training = training
+        l2_reg = None
+        
+        conv1_1 = UNet.conv(inputs, filters=64, l2_reg_scale=l2_reg, batchnorm_istraining=is_training)
+        conv1_2 = UNet.conv(conv1_1, filters=64, l2_reg_scale=l2_reg, batchnorm_istraining=is_training)
+        pool1 = UNet.pool(conv1_2)
 
-        h1 = conv1d_layer(inputs = inputs, filters = 128, kernel_size = 15, strides = 1, activation = None, name = 'h1_conv')
-        h1_gates = conv1d_layer(inputs = inputs, filters = 128, kernel_size = 15, strides = 1, activation = None, name = 'h1_conv_gates')
-        h1_glu = gated_linear_layer(inputs = h1, gates = h1_gates, name = 'h1_glu')
+        # 1/2, 1/2, 64
+        conv2_1 = UNet.conv(pool1, filters=128, l2_reg_scale=l2_reg, batchnorm_istraining=is_training)
+        conv2_2 = UNet.conv(conv2_1, filters=128, l2_reg_scale=l2_reg, batchnorm_istraining=is_training)
+        pool2 = UNet.pool(conv2_2)
 
-        # Downsample
-        d1 = downsample1d_block(inputs = h1_glu, filters = 256, kernel_size = 5, strides = 2, name_prefix = 'downsample1d_block1_')
-        d2 = downsample1d_block(inputs = d1, filters = 512, kernel_size = 5, strides = 2, name_prefix = 'downsample1d_block2_')
+        # 1/4, 1/4, 128
+        conv3_1 = UNet.conv(pool2, filters=256, l2_reg_scale=l2_reg, batchnorm_istraining=is_training)
+        conv3_2 = UNet.conv(conv3_1, filters=256, l2_reg_scale=l2_reg, batchnorm_istraining=is_training)
+        pool3 = UNet.pool(conv3_2)
 
-        # Residual blocks
-        r1 = residual1d_block(inputs = d2, filters = 1024, kernel_size = 4, strides = 1, name_prefix = 'residual1d_block1_')
-        r2 = residual1d_block(inputs = r1, filters = 1024, kernel_size = 4, strides = 1, name_prefix = 'residual1d_block2_')
-        rd1 = downsample1d_block(inputs = r2, filters = 1024, kernel_size = 4, strides = 2, name_prefix = 'downsample1d_block_r1')
-        r30 = residual1d_block(inputs = rd1, filters = 2048, kernel_size = 3, strides = 1, name_prefix = 'residual1d_block30_')
-        r31 = residual1d_block(inputs = r30, filters = 2048, kernel_size = 2, strides = 1, name_prefix = 'residual1d_block31_')
-        r32 = residual1d_block(inputs = r31, filters = 2048, kernel_size = 2, strides = 1, name_prefix = 'residual1d_block32_')
-        r33 = residual1d_block(inputs = r32, filters = 2048, kernel_size = 3, strides = 1, name_prefix = 'residual1d_block33_')
-        ru1 = upsample1d_block(inputs = r33, filters = 1024, kernel_size = 4, strides = 1, shuffle_size = 2, name_prefix = 'upsample1d_block_r1')
-        r4 = residual1d_block(inputs = ru1, filters = 1024, kernel_size = 4, strides = 1, name_prefix = 'residual1d_block5_')
-        r5 = residual1d_block(inputs = r4, filters = 1024, kernel_size = 4, strides = 1, name_prefix = 'residual1d_block6_')
+        # 1/8, 1/8, 256
+        conv4_1 = UNet.conv(pool3, filters=512, l2_reg_scale=l2_reg, batchnorm_istraining=is_training)
+        conv4_2 = UNet.conv(conv4_1, filters=512, l2_reg_scale=l2_reg, batchnorm_istraining=is_training)
+        pool4 = UNet.pool(conv4_2)
+        
+        r1 = residual1d_block(inputs = pool4, filters = 1024, kernel_size = 3, strides = 1, name_prefix = 'residual1d_block1_')
+        r2 = residual1d_block(inputs = r1, filters = 1024, kernel_size = 3, strides = 1, name_prefix = 'residual1d_block2_')
+        r3 = residual1d_block(inputs = r2, filters = 1024, kernel_size = 3, strides = 1, name_prefix = 'residual1d_block3_')
+        r4 = residual1d_block(inputs = r3, filters = 1024, kernel_size = 3, strides = 1, name_prefix = 'residual1d_block4_')
+        r5 = residual1d_block(inputs = r4, filters = 1024, kernel_size = 3, strides = 1, name_prefix = 'residual1d_block5_')
+        r6 = residual1d_block(inputs = r5, filters = 1024, kernel_size = 3, strides = 1, name_prefix = 'residual1d_block6_')
+        
+        up0 = upsample1d_block(inputs = r6, filters = 1024, kernel_size = 5, strides = 1, shuffle_size = 2, name_prefix="up0")
+        concated0 = tf.concat([up0, conv4_2], axis=2, name="concat_0")
 
-        # Upsample
-        u1 = upsample1d_block(inputs = r5, filters = 1024, kernel_size = 5, strides = 1, shuffle_size = 2, name_prefix = 'upsample1d_block1_')
-        u2 = upsample1d_block(inputs = u1, filters = 512, kernel_size = 5, strides = 1, shuffle_size = 2, name_prefix = 'upsample1d_block2_')
+        conv_up1_1 = UNet.conv(concated0, filters=512, l2_reg_scale=l2_reg, name="conv_up_11")
+        conv_up1_2 = UNet.conv(conv_up1_1, filters=512, l2_reg_scale=l2_reg, name="conv_up_12")
+        up1 = upsample1d_block(inputs = conv_up1_2, filters = 512, kernel_size = 5, strides = 1, shuffle_size = 2, name_prefix="up1")
+        concated1 = tf.concat([up1, conv3_2], axis=2, name="concat_1")
 
-        # Output
-        o1 = conv1d_layer(inputs = u2, filters = num_features, kernel_size = 15, strides = 1, activation = None, name = 'o1_conv')
-        o2 = tf.transpose(o1, perm = [0, 2, 1], name = 'output_transpose')
+        conv_up2_1 = UNet.conv(concated1, filters=256, l2_reg_scale=l2_reg, name="conv_up_21")
+        conv_up2_2 = UNet.conv(conv_up2_1, filters=256, l2_reg_scale=l2_reg, name="conv_up_22")
+        up2 = upsample1d_block(inputs = conv_up2_2, filters = 256, kernel_size = 5, strides = 1, shuffle_size = 2, name_prefix="up2")
+        concated2 = tf.concat([up2, conv2_2], axis=2, name="concat_2")
 
-    return o2
+        conv_up3_1 = UNet.conv(concated2, filters=128, l2_reg_scale=l2_reg, name="conv_up_31")
+        conv_up3_2 = UNet.conv(conv_up3_1, filters=128, l2_reg_scale=l2_reg, name="conv_up_32")
+        up3 = upsample1d_block(inputs = conv_up3_2, filters = 128, kernel_size = 5, strides = 1, shuffle_size = 2, name_prefix="up3")
+        concated3 = tf.concat([up3, conv1_2], axis=2, name="concat_3")
 
-def generator_gatedcnn(inputs, reuse = False, scope_name = 'generator_gatedcnn', num_features = 24):
+        conv_up4_1 = UNet.conv(concated3, filters=64, l2_reg_scale=l2_reg, name="conv_up_41")
+        conv_up4_2 = UNet.conv(conv_up4_1, filters=64, l2_reg_scale=l2_reg, name="conv_up_42")
+        
+        outputs = conv1d_layer(inputs = conv_up4_2, filters = num_features, kernel_size = 15, strides = 1, activation = None)
+        outputs = tf.transpose(outputs, perm = [0, 2, 1], name = 'output_transpose')
+       
+    return outputs
+
+def generator_gatedcnn(inputs, reuse = False, scope_name = 'generator_gatedcnn', num_features = 24, training = True):
 
     # inputs has shape [batch_size, num_features, time]
     # we need to convert it to [batch_size, time, num_features] for 1D convolution
@@ -216,8 +300,7 @@ def generator_gatedcnn(inputs, reuse = False, scope_name = 'generator_gatedcnn',
         r4 = residual1d_block(inputs = r3, filters = 1024, kernel_size = 3, strides = 1, name_prefix = 'residual1d_block4_')
         r5 = residual1d_block(inputs = r4, filters = 1024, kernel_size = 3, strides = 1, name_prefix = 'residual1d_block5_')
         r6 = residual1d_block(inputs = r5, filters = 1024, kernel_size = 3, strides = 1, name_prefix = 'residual1d_block6_')
-
-        # Upsample
+        
         u1 = upsample1d_block(inputs = r6, filters = 1024, kernel_size = 5, strides = 1, shuffle_size = 2, name_prefix = 'upsample1d_block1_')
         u2 = upsample1d_block(inputs = u1, filters = 512, kernel_size = 5, strides = 1, shuffle_size = 2, name_prefix = 'upsample1d_block2_')
 
