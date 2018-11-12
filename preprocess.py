@@ -162,6 +162,10 @@ def wav_padding(wav, sr, frame_period, multiple = 4):
     num_pad_right = num_frames_diff - num_pad_left
     wav_padded = np.pad(wav, (num_pad_left, num_pad_right), 'constant', constant_values = 0)
 
+    nlen = len(wav_padded) + 80
+    a = 2**5
+    wav_padded = np.pad(wav_padded, (0, (a-(nlen//80)%a)*80 - (nlen%80)), 'constant', constant_values = 0)
+    
     return wav_padded
 
 
