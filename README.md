@@ -8,8 +8,7 @@ https://github.com/leimao/Voice_Converter_CycleGAN
 
 
 ### Dataset download
-you can download dataset from here.
-https://console.aws.amazon.com/s3/buckets/ai-team-dataset-bucket/models/aya-voice/datasets/?region=us-east-2&tab=overview
+Download and unzip [VCC2016](https://datashare.is.ed.ac.uk/handle/10283/2211) dataset to designated directories.
 
 ### Dataset preprocessing
 you can use the dataset without any preprocessing.
