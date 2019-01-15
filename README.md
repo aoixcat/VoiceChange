@@ -8,7 +8,7 @@ https://github.com/leimao/Voice_Converter_CycleGAN
 
 
 ### Dataset download
-Download and unzip [VCC2016](https://datashare.is.ed.ac.uk/handle/10283/2211) dataset to designated directories.
+Download and unzip [VCC2016](https://datashare.is.ed.ac.uk/handle/10283/2211) dataset.
 
 ### Dataset preprocessing
 you can use the dataset without any preprocessing.
